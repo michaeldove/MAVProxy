@@ -27,45 +27,41 @@ class BonjourModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super(BonjourModule, self).__init__(mpstate,
               "discover", "discover bonjour gcs services")
-        self.connectedGCS = []
-        self.discoverServices()
+        self.connected_GCS = []
+        self.discover_services()
         print("Module discover loaded")
 
-    def discoverServices(self):
+    def discover_services(self):
         """Discover Bonjour services."""
 
         self.browse_sdRef = pybonjour.DNSServiceBrowse(
                                             regtype = self.REG_TYPE,
                                             callBack = self.browse_callback)
-        self.registerServiceDescriptor(self.browse_sdRef,
+        self.register_service_descriptor(self.browse_sdRef,
                 pybonjour.DNSServiceProcessResult)
 
 
-    def mavlink_packet(self, m):
-        '''handle an incoming mavlink packet'''
-        pass
-
-    def shouldConnectToGCS(self, fullname, port):
+    def should_connect_to_GCS(self, fullname, port):
         """ Determine if a connection to the GCS already exists."""
-        return (fullname, port) not in self.connectedGCS
+        return (fullname, port) not in self.connected_GCS
 
-    def connectToGCS(self, fullname, ip_address, port):
+    def connect_to_GCS(self, fullname, ip_address, port):
         """Start output of MAVLink packets to GCS."""
         address = '%s:%s' % (ip_address, port)
         self.mpstate.mav_outputs.append(
                 mavutil.mavlink_connection(address,
-                                           baud=self.baud,
+                                           baud=self.BAUD,
                                            input=False))
-        self.registerConnectionToGCS(fullname, port)
+        self.register_connection_to_GCS(fullname, port)
 
-    def registerConnectionToGCS(self, fullname, port):
-        self.connectedGCS.append((fullname, port))
+    def register_connection_to_GCS(self, fullname, port):
+        self.connected_GCS.append((fullname, port))
 
-    def deregisterServiceDescriptor(self, serviceDescriptor):
+    def deregister_service_descriptor(self, serviceDescriptor):
         """Deregister a service descriptor from event polling."""
         del self.mpstate.select_extra[serviceDescriptor.fileno()]
 
-    def registerServiceDescriptor(self, serviceDescriptor, handler):
+    def register_service_descriptor(self, serviceDescriptor, handler):
         """Register a service descriptor for event polling."""
         self.mpstate.select_extra[serviceDescriptor.fileno()] = (
                 handler, serviceDescriptor)
@@ -77,10 +73,10 @@ class BonjourModule(mp_module.MPModule):
         if errorCode == pybonjour.kDNSServiceErr_NoError:
             ip_address = socket.inet_ntoa(rdata)
 
-            self.deregisterServiceDescriptor(sdRef)
+            self.deregister_service_descriptor(sdRef)
 
-            if self.shouldConnectToGCS(fullname, port):
-                self.connectToGCS(fullname, ip_address, port)
+            if self.should_connect_to_GCS(fullname, port):
+                self.connect_to_GCS(fullname, ip_address, port)
 
                 print 'Connected to %s at %s:%d' % (
                         serviceName, ip_address, port)
@@ -92,7 +88,7 @@ class BonjourModule(mp_module.MPModule):
         """Callback when service has been resolved to a host and port.""" 
 
         if errorCode == pybonjour.kDNSServiceErr_NoError:
-            self.deregisterServiceDescriptor(sdRef)
+            self.deregister_service_descriptor(sdRef)
 
             query_func = functools.partial(self.query_record_callback,
                                            port=port,
@@ -105,7 +101,7 @@ class BonjourModule(mp_module.MPModule):
                                         callBack = query_func,
                                         )
 
-            self.registerServiceDescriptor(query_sdRef,
+            self.register_service_descriptor(query_sdRef,
                     pybonjour.DNSServiceProcessResult)
 
 
@@ -130,8 +126,14 @@ class BonjourModule(mp_module.MPModule):
                                                     replyDomain,
                                                     resolve_func)
 
-        self.registerServiceDescriptor(resolve_sdRef,
+        self.register_service_descriptor(resolve_sdRef,
                                        pybonjour.DNSServiceProcessResult)
+
+    def mavlink_packet(self, m):
+        '''handle an incoming mavlink packet'''
+        pass
+
+
 
 def init(mpstate):
     '''initialise module'''
